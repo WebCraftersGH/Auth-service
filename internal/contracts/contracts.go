@@ -21,7 +21,7 @@ type TokenSVC interface {
 }
 
 type MailSVC interface {
-	SendMail(ctx context.Context, toEmail, code domain.OTP) error
+	SendMail(ctx context.Context, toEmail string, code domain.OTP) error
 }
 
 type OTPSVC interface {
@@ -54,4 +54,28 @@ type MailsRepo interface {
 	SaveMail(ctx context.Context, m domain.Mail) error
 	GetMail(ctx context.Context, mailID uuid.UUID) (domain.Mail, error)
 	DeleteMail(ctx context.Context, mailID uuid.UUID) error
+}
+
+type ILogger interface {
+	Trace(args ...any)
+
+	Tracef(format string, args ...any)
+
+	Debug(args ...any)
+	Debugf(format string, args ...any)
+
+	Info(args ...any)
+	Infof(format string, args ...any)
+
+	Warn(args ...any)
+	Warnf(format string, args ...any)
+
+	Error(args ...any)
+	Errorf(format string, args ...any)
+
+	Fatal(args ...any)
+	Fatalf(format string, args ...any)
+
+	Panic(args ...any)
+	Panicf(format string, args ...any)
 }
