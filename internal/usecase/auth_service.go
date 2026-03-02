@@ -120,7 +120,28 @@ func (s *authSVC) OTPCheck(ctx context.Context, email, code string) (domain.Toke
 	return t, nil
 }
 
-func (s *authSVC) AuthCheck(ctx context.Context, token string) error
+func (s *authSVC) AuthCheck(ctx context.Context, token, email string) error {
+
+	e, err := s.validateEmail(email)
+	if err != nil {
+		s.logger.Debugf("auth check: invalid email: %s", email)
+		return fmt.Errorf("%w: %v", domain.ErrInvalidEmail, err)
+	}
+
+	t, err := s.tokenSVC.ReadToken(ctx, e)
+	if err != nil {
+		if errors.Is(err, domain.InternalError) {
+			s.logger.Errorf("%w: %v", domain.InternalError, err)
+		}
+		return domain.ErrUnauthorized
+	}
+
+	if token != t.Value {
+		return domain.ErrUnauthorized
+	}
+
+	return nil
+}
 
 func (s *authSVC) Logout(ctx context.Context, email string) error {
 

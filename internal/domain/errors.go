@@ -17,6 +17,7 @@ var (
 
 	ErrTokenNotFound = errors.New("Token not found")
 	ErrTokenExpired  = errors.New("Token expired")
+	ErrUnauthorized  = errors.New("Unauthorized")
 
 	InternalError = errors.New("Internal error")
 )
