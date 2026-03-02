@@ -87,16 +87,34 @@ func (s *authSVC) OTPCheck(ctx context.Context, email, code string) (domain.Toke
 	u, err = s.usersRepo.GetUserByEmail(ctx, e)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
-			//TODO Создать пользователя
+			// If user not found.
+			user := domain.User{
+				Email: e,
+			}
+
+			u, err = s.usersRepo.CreateUser(ctx, user)
+			if err != nil {
+				s.logger.Errorf("otp check: failed to create new user, email=%s", e)
+				return domain.Token{}, fmt.Errorf("%w: %v", domain.InternalError, err)
+			}
 		}
+		s.logger.Errorf("otp check: get user failed, email=%s", e)
+		return domain.Token{}, fmt.Errorf("%w: %v", domain.InternalError, err)
 	}
 
 	var t domain.Token
 	t, err = s.tokenSVC.ReadToken(ctx, u.Email)
 	if err != nil {
-		if errors.Is(err, domain.ErrTokenNotFound) {
-			//TODO Сгенерировать и сохранить токен
+		if errors.Is(err, domain.ErrTokenNotFound) || errors.Is(err, domain.ErrTokenExpired) {
+			//Generate and save token
+			t, err = s.tokenSVC.GenerateJWT(u)
+			if err != nil {
+				s.logger.Errorf("otp check: generate jwt failed, email=%s", e)
+				return domain.Token{}, fmt.Errorf("%w: %v", domain.InternalError, err)
+			}
 		}
+		s.logger.Errorf("otp check: read token failed, email=%s", e)
+		return domain.Token{}, fmt.Errorf("%w: %v", domain.InternalError, err)
 	}
 
 	return t, nil

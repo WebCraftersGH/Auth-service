@@ -31,7 +31,7 @@ type OTPSVC interface {
 }
 
 type UsersRepo interface {
-	SaveUser(ctx context.Context, u domain.User) error
+	CreateUser(ctx context.Context, u domain.User) (domain.User, error)
 	GetUserByID(ctx context.Context, userID uuid.UUID) (domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (domain.User, error)
 	DeleteUserByID(ctx context.Context, userID uuid.UUID) error
