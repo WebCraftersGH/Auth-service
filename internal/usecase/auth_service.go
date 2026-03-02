@@ -121,7 +121,27 @@ func (s *authSVC) OTPCheck(ctx context.Context, email, code string) (domain.Toke
 }
 
 func (s *authSVC) AuthCheck(ctx context.Context, token string) error
-func (s *authSVC) Logout(ctx context.Context, token string) error
+
+func (s *authSVC) Logout(ctx context.Context, email string) error {
+
+	e, err := s.validateEmail(email)
+	if err != nil {
+		s.logger.Debugf("logout: invalid email: %s", email)
+		return fmt.Errorf("%w: %v", domain.ErrInvalidEmail, err)
+	}
+
+	err = s.tokenSVC.DeleteToken(ctx, e)
+	if err != nil {
+		if errors.Is(err, domain.ErrTokenNotFound) {
+			s.logger.Debugf("logout: user already logout, email=%s", e)
+			return err
+		}
+		s.logger.Errorf("logout: delete token error, email=%s", e)
+		return fmt.Errorf("%w: %v", domain.InternalError, err)
+	}
+
+	return nil
+}
 
 func (s *authSVC) validateEmail(raw string) (string, error) {
 	str := strings.TrimSpace(raw)

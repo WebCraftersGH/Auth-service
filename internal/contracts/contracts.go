@@ -10,7 +10,7 @@ type AuthSVC interface {
 	StartAuth(ctx context.Context, email string) error
 	OTPCheck(ctx context.Context, email, code string) (domain.Token, error)
 	AuthCheck(ctx context.Context, token string) error
-	Logout(ctx context.Context, token string) error
+	Logout(ctx context.Context, email string) error
 }
 
 type TokenSVC interface {
