@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"context"
+
 	"github.com/WebCraftersGH/Auth-service/internal/domain"
 	"github.com/google/uuid"
 )
@@ -18,6 +19,7 @@ type TokenSVC interface {
 	SaveToken(ctx context.Context, token domain.Token) error
 	ReadToken(ctx context.Context, email string) (domain.Token, error)
 	DeleteToken(ctx context.Context, email string) error
+	ParseToken(token string) (domain.TokenClaims, error)
 }
 
 type MailSVC interface {
@@ -57,9 +59,13 @@ type MailsRepo interface {
 	DeleteMail(ctx context.Context, mailID uuid.UUID) error
 }
 
+type UserEventsProducer interface {
+	PublishUserCreateRequested(ctx context.Context, event domain.UserCreateRequestedEvent) error
+	Close() error
+}
+
 type ILogger interface {
 	Trace(args ...any)
-
 	Tracef(format string, args ...any)
 
 	Debug(args ...any)

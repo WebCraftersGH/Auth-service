@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -27,7 +28,7 @@ func (hook *writerHook) Fire(entry *logrus.Entry) error {
 	}
 
 	for _, w := range hook.Writer {
-		w.Write([]byte(line))
+		_, _ = w.Write([]byte(line))
 	}
 
 	return nil
@@ -47,9 +48,10 @@ func GetLogger() Logger {
 	return Logger{e}
 }
 
-func Init() {
+func Init(level string) {
 	l := logrus.New()
 	l.SetReportCaller(true)
+	l.SetLevel(parseLevel(level))
 	l.Formatter = &logrus.TextFormatter{
 		CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
 			filename := path.Base(f.File)
@@ -58,14 +60,11 @@ func Init() {
 		FullTimestamp: true,
 	}
 
-	_, err := os.Stat(LOGS_PATH)
-	if os.IsNotExist(err) {
-		os.MkdirAll(LOGS_PATH, 8644)
-	} else {
-		panic(err)
+	if _, err := os.Stat(LOGS_PATH); os.IsNotExist(err) {
+		_ = os.MkdirAll(LOGS_PATH, 0755)
 	}
 
-	logFilename := LOGS_FILENAME + ".log"
+	logFilename := path.Join(LOGS_PATH, LOGS_FILENAME+".log")
 	logFile, err := os.OpenFile(logFilename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
 	if err != nil {
 		panic(err)
@@ -78,4 +77,12 @@ func Init() {
 	})
 
 	e = logrus.NewEntry(l)
+}
+
+func parseLevel(level string) logrus.Level {
+	parsed, err := logrus.ParseLevel(strings.ToLower(strings.TrimSpace(level)))
+	if err != nil {
+		return logrus.InfoLevel
+	}
+	return parsed
 }

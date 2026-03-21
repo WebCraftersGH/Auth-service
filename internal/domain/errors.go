@@ -1,23 +1,25 @@
 package domain
 
-import (
-	"errors"
-)
+import "errors"
 
 var (
-	ErrInvalidEmail = errors.New("Invalid email")
+	ErrInvalidEmail = errors.New("invalid email")
 
-	ErrOtpSave           = errors.New("Otp save failed")
-	ErrInvalidOTP        = errors.New("Invalid otp code")
-	ErrToManyOTPAttempts = errors.New("To many attempts")
+	ErrOtpSave           = errors.New("otp save failed")
+	ErrInvalidOTP        = errors.New("invalid otp code")
+	ErrToManyOTPAttempts = errors.New("too many attempts")
+	ErrOTPExpired        = errors.New("otp expired")
+	ErrOTPNotFound       = errors.New("otp not found")
 
-	ErrSendMail = errors.New("Send mail failed")
+	ErrSendMail = errors.New("send mail failed")
 
-	ErrUserNotFound = errors.New("User not found")
+	ErrUserNotFound = errors.New("user not found")
 
-	ErrTokenNotFound = errors.New("Token not found")
-	ErrTokenExpired  = errors.New("Token expired")
-	ErrUnauthorized  = errors.New("Unauthorized")
+	ErrTokenNotFound = errors.New("token not found")
+	ErrTokenExpired  = errors.New("token expired")
+	ErrUnauthorized  = errors.New("unauthorized")
 
-	InternalError = errors.New("Internal error")
+	ErrKafkaPublish = errors.New("kafka publish failed")
+
+	InternalError = errors.New("internal error")
 )
