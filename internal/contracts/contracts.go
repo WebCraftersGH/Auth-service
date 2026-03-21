@@ -37,6 +37,7 @@ type UsersRepo interface {
 	DeleteUserByID(ctx context.Context, userID uuid.UUID) error
 }
 
+//go:generate mockgen -destination mocks/otpsRepo_mock.go -package mocks github.com/WebCraftersGH/Auth-service/internal/contracts OTPsRepo
 type OTPsRepo interface {
 	SaveCode(otp domain.OTP, key string) error
 	GetCode(key string) (domain.OTP, error)
