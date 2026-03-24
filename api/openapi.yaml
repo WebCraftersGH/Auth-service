@@ -1,0 +1,405 @@
+openapi: 3.0.3
+info:
+  title: Auth Service API
+  version: 1.0.0
+  description: |
+    API сервиса авторизации по email + OTP.
+
+    Спецификация собрана по текущей реализации обработчиков в коде.
+    Основной сценарий:
+      1. Клиент вызывает `POST /auth/start` и получает письмо с OTP-кодом.
+      2. Клиент вызывает `POST /auth/verify` и получает JWT.
+      3. Клиент передает JWT в заголовке `Authorization: Bearer <token>` для `GET /auth/check` или `POST /auth/check`.
+      4. Клиент вызывает `POST /auth/logout` для удаления токена по email.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Service
+    description: Служебные ручки
+  - name: Auth
+    description: Авторизация по email + OTP
+
+paths:
+  /health:
+    get:
+      tags: [Service]
+      summary: Проверка доступности сервиса
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Сервис доступен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              examples:
+                ok:
+                  value:
+                    message: ok
+
+  /auth/start:
+    post:
+      tags: [Auth]
+      summary: Запустить авторизацию и отправить OTP на email
+      description: |
+        Валидирует email, генерирует OTP-код и отправляет его на почту.
+        По текущей реализации длина OTP по умолчанию 6 символов, допустимые символы: латинские заглавные буквы и цифры.
+        Фактическая длина и TTL зависят от env-конфига сервиса.
+      operationId: startAuth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartAuthRequest'
+            examples:
+              default:
+                value:
+                  email: user@example.com
+      responses:
+        '200':
+          description: OTP отправлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              examples:
+                sent:
+                  value:
+                    message: otp sent
+        '400':
+          description: Некорректный JSON или некорректный email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidJson:
+                  value:
+                    error: invalid json
+                invalidEmail:
+                  value:
+                    error: 'invalid email: invalid email'
+        '405':
+          description: Метод не поддерживается
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: method not allowed
+        '500':
+          description: Внутренняя ошибка, ошибка отправки email или сохранения OTP
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                otpSaveFailed:
+                  value:
+                    error: 'otp save failed: internal error'
+                sendMailFailed:
+                  value:
+                    error: 'send mail failed: internal error'
+
+  /auth/verify:
+    post:
+      tags: [Auth]
+      summary: Проверить OTP и получить JWT
+      description: |
+        Проверяет OTP-код для email.
+        При первом входе создает локального пользователя и публикует Kafka-событие на создание пользователя в другом сервисе.
+        Если у пользователя уже есть неистекший токен, может вернуть существующий токен.
+      operationId: verifyOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpRequest'
+            examples:
+              default:
+                value:
+                  email: user@example.com
+                  code: ABC123
+      responses:
+        '200':
+          description: OTP подтвержден, токен выдан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyOtpResponse'
+              examples:
+                token:
+                  value:
+                    token: <jwt>
+        '400':
+          description: Некорректный JSON, email, OTP или истекший OTP
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidJson:
+                  value:
+                    error: invalid json
+                invalidEmail:
+                  value:
+                    error: 'invalid email: invalid email'
+                invalidOtp:
+                  value:
+                    error: 'invalid otp code: invalid otp code'
+                otpExpired:
+                  value:
+                    error: 'otp expired: otp expired'
+        '429':
+          description: Превышено число попыток ввода OTP
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: 'too many attempts: too many attempts'
+        '500':
+          description: Внутренняя ошибка, ошибка Kafka, генерации или сохранения токена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                kafkaPublish:
+                  value:
+                    error: 'kafka publish failed: kafka publish failed'
+                internal:
+                  value:
+                    error: 'internal error: internal error'
+
+  /auth/check:
+    get:
+      tags: [Auth]
+      summary: Проверить Bearer-токен
+      description: |
+        Проверяет подпись JWT, срок его действия и совпадение с токеном, сохраненным в хранилище.
+        По коду этот endpoint доступен и как `GET`, и как `POST`.
+      operationId: checkAuthGet
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Токен валиден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: authorized
+        '401':
+          description: Токен отсутствует, недействителен или истек
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  value:
+                    error: unauthorized
+                tokenExpired:
+                  value:
+                    error: token expired
+                tokenNotFound:
+                  value:
+                    error: token not found
+        '405':
+          description: Метод не поддерживается
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: method not allowed
+        '500':
+          description: Внутренняя ошибка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Auth]
+      summary: Проверить Bearer-токен
+      description: |
+        Полный аналог `GET /auth/check`.
+        Существует в текущем коде для совместимости с клиентами, которые отправляют POST-запрос.
+      operationId: checkAuthPost
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Токен валиден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: authorized
+        '401':
+          description: Токен отсутствует, недействителен или истек
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  value:
+                    error: unauthorized
+                tokenExpired:
+                  value:
+                    error: token expired
+                tokenNotFound:
+                  value:
+                    error: token not found
+        '405':
+          description: Метод не поддерживается
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: method not allowed
+        '500':
+          description: Внутренняя ошибка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Выйти из системы
+      description: |
+        Удаляет токен по email.
+        В текущей реализации logout не использует Bearer-токен и работает по телу запроса с email.
+      operationId: logout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+            examples:
+              default:
+                value:
+                  email: user@example.com
+      responses:
+        '200':
+          description: Выход выполнен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: logged out
+        '400':
+          description: Некорректный JSON или email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidJson:
+                  value:
+                    error: invalid json
+                invalidEmail:
+                  value:
+                    error: 'invalid email: invalid email'
+        '404':
+          description: Токен пользователя не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: token not found
+        '405':
+          description: Метод не поддерживается
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: method not allowed
+        '500':
+          description: Внутренняя ошибка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    StartAuthRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email пользователя
+          example: user@example.com
+
+    VerifyOtpRequest:
+      type: object
+      required: [email, code]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email пользователя
+          example: user@example.com
+        code:
+          type: string
+          description: OTP-код из письма
+          example: ABC123
+
+    LogoutRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email пользователя, чей токен нужно удалить
+          example: user@example.com
+
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: ok
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: unauthorized
+
+    VerifyOtpResponse:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: JWT пользователя
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...

@@ -1,0 +1,4 @@
+time="2026-03-22T17:59:54+03:00" level=info msg="auth-service is listening on :8080" func="main.main.func1()" file="main.go:74"
+time="2026-03-22T18:10:03+03:00" level=debug msg="start auth: otp generated and sent, email=fortest@gmail.com" func="github.com/WebCraftersGH/Auth-service/internal/usecase.(*authSVC).StartAuth()" file="auth_service.go:63"
+time="2026-03-22T18:10:43+03:00" level=error msg="otp check: failed to publish user-create event, email=fortest@gmail.com err=[3] Unknown Topic Or Partition: the request is for a topic or partition that does not exist on this broker" func="github.com/WebCraftersGH/Auth-service/internal/usecase.(*authSVC).OTPCheck()" file="auth_service.go:102"
+time="2026-03-22T18:15:57+03:00" level=debug msg="start auth: otp generated and sent, email=drpsih2004@gmail.com" func="github.com/WebCraftersGH/Auth-service/internal/usecase.(*authSVC).StartAuth()" file="auth_service.go:63"
