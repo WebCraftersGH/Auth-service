@@ -22,10 +22,10 @@ func New(authSVC contracts.AuthSVC, logger contracts.ILogger) *Controller {
 
 func (c *Controller) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/health", c.handleHealth)
-	mux.HandleFunc("/auth/start", c.handleStartAuth)
-	mux.HandleFunc("/auth/verify", c.handleVerifyOTP)
-	mux.HandleFunc("/auth/check", c.handleAuthCheck)
-	mux.HandleFunc("/auth/logout", c.handleLogout)
+	mux.HandleFunc("/api/v1/auth/start", c.handleStartAuth)
+	mux.HandleFunc("/api/v1/auth/verify", c.handleVerifyOTP)
+	mux.HandleFunc("/api/v1/auth/check", c.handleAuthCheck)
+	mux.HandleFunc("/api/v1/auth/logout", c.handleLogout)
 }
 
 func (c *Controller) handleHealth(w http.ResponseWriter, _ *http.Request) {
