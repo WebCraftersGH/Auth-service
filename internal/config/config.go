@@ -54,7 +54,7 @@ func Load() (Config, error) {
 		OTPMaxAttempts: getEnvInt("OTP_MAX_ATTEMPTS", 5),
 
 		DBUser: getEnv("DB_USER", "authuser"),
-		DBPass: getEnv("DB_PASS", "authpass"),
+		DBPass: getEnv("DB_PASSWORD", "authpass"),
 		DBHost: getEnv("DB_HOST", "localhost"),
 		DBPort: getEnv("DB_PORT", "5432"),
 		DBName: getEnv("DB_NAME", "authdb"),
