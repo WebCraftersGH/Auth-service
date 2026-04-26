@@ -11,6 +11,7 @@ import (
 
 	"github.com/WebCraftersGH/Auth-service/internal/config"
 	"github.com/WebCraftersGH/Auth-service/internal/controller"
+	docscontroller "github.com/WebCraftersGH/Auth-service/internal/controller/docs"
 	appkafka "github.com/WebCraftersGH/Auth-service/internal/kafka"
 	mailsrepo "github.com/WebCraftersGH/Auth-service/internal/repository/mails_repo"
 	otpsrepo "github.com/WebCraftersGH/Auth-service/internal/repository/otps_repo"
@@ -63,6 +64,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	controller.New(authSVC, logger).Register(mux)
+	docscontroller.NewDocsHandler().RegisterRoutes(mux)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%s", cfg.HTTPPort),

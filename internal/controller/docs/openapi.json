@@ -1,0 +1,558 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Auth Service API",
+    "version": "1.0.0",
+    "description": "API сервиса авторизации по email и одноразовому OTP-коду. Сервис отправляет OTP на почту, проверяет код, создает локального пользователя при первом входе, выпускает JWT-токен, проверяет авторизацию и выполняет выход пользователя.",
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Локальный запуск сервиса"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Проверка доступности сервиса"
+    },
+    {
+      "name": "Auth",
+      "description": "Авторизация по email и OTP-коду"
+    },
+    {
+      "name": "Docs",
+      "description": "Документация Swagger/OpenAPI"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Проверить состояние сервиса",
+        "description": "Возвращает простой ответ, подтверждающий, что HTTP-сервер работает.",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "Сервис доступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                },
+                "example": {
+                  "message": "ok"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/start": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Начать авторизацию",
+        "description": "Принимает email пользователя, генерирует OTP-код и отправляет его на указанную почту. Email нормализуется: пробелы по краям удаляются, адрес приводится к нижнему регистру.",
+        "operationId": "startAuth",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartAuthRequest"
+              },
+              "example": {
+                "email": "user@example.com"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP-код успешно создан и отправлен на email",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                },
+                "example": {
+                  "message": "otp sent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/verify": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Подтвердить OTP-код",
+        "description": "Проверяет email и OTP-код. Если пользователь с таким email еще не существует, сервис создает локального пользователя и публикует Kafka-событие на создание пользовательского профиля. В случае успешной проверки возвращает JWT-токен.",
+        "operationId": "verifyOtp",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOTPRequest"
+              },
+              "example": {
+                "email": "user@example.com",
+                "code": "123456"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP-код подтвержден, токен авторизации выдан",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyOTPResponse"
+                },
+                "example": {
+                  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example.signature"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/check": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Проверить авторизацию",
+        "description": "Проверяет Bearer-токен из заголовка Authorization. Токен должен быть валидным JWT и совпадать с токеном, сохраненным для пользователя в базе данных.",
+        "operationId": "checkAuthGet",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Токен валиден, пользователь авторизован",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                },
+                "example": {
+                  "message": "authorized"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Проверить авторизацию",
+        "description": "Альтернативный POST-вариант проверки Bearer-токена из заголовка Authorization. Тело запроса не требуется.",
+        "operationId": "checkAuthPost",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Токен валиден, пользователь авторизован",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                },
+                "example": {
+                  "message": "authorized"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Выполнить выход пользователя",
+        "description": "Удаляет сохраненный токен пользователя по email. После этого ранее выданный JWT не пройдет проверку через endpoint проверки авторизации.",
+        "operationId": "logout",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutRequest"
+              },
+              "example": {
+                "email": "user@example.com"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Токен пользователя удален",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                },
+                "example": {
+                  "message": "logged out"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/swagger/openapi.json": {
+      "get": {
+        "tags": ["Docs"],
+        "summary": "Получить OpenAPI-спецификацию",
+        "description": "Возвращает JSON-файл OpenAPI, встроенный в сервис.",
+        "operationId": "getOpenApiSpec",
+        "responses": {
+          "200": {
+            "description": "OpenAPI-спецификация в формате JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "OpenAPI-документ"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/swagger/": {
+      "get": {
+        "tags": ["Docs"],
+        "summary": "Открыть Swagger UI",
+        "description": "Возвращает HTML-страницу Swagger UI для просмотра документации API в браузере.",
+        "operationId": "getSwaggerUi",
+        "responses": {
+          "200": {
+            "description": "HTML-страница Swagger UI",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/swagger": {
+      "get": {
+        "tags": ["Docs"],
+        "summary": "Перенаправить на Swagger UI",
+        "description": "Перенаправляет запрос на /swagger/.",
+        "operationId": "redirectToSwaggerUi",
+        "responses": {
+          "301": {
+            "description": "Постоянное перенаправление на /swagger/",
+            "headers": {
+              "Location": {
+                "description": "Адрес Swagger UI",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "/swagger/"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT-токен, полученный после успешной проверки OTP-кода. Передается в заголовке Authorization в формате: Bearer <token>."
+      }
+    },
+    "schemas": {
+      "StartAuthRequest": {
+        "type": "object",
+        "description": "Запрос на начало авторизации и отправку OTP-кода.",
+        "required": ["email"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254,
+            "description": "Email пользователя, на который будет отправлен OTP-код.",
+            "example": "user@example.com"
+          }
+        },
+        "additionalProperties": false
+      },
+      "VerifyOTPRequest": {
+        "type": "object",
+        "description": "Запрос на проверку OTP-кода.",
+        "required": ["email", "code"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254,
+            "description": "Email пользователя, для которого был отправлен OTP-код.",
+            "example": "user@example.com"
+          },
+          "code": {
+            "type": "string",
+            "description": "OTP-код из письма. Длина кода зависит от настройки OTP_LENGTH, по умолчанию 6 символов.",
+            "example": "123456"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LogoutRequest": {
+        "type": "object",
+        "description": "Запрос на выход пользователя из системы.",
+        "required": ["email"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254,
+            "description": "Email пользователя, для которого нужно удалить сохраненный токен.",
+            "example": "user@example.com"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MessageResponse": {
+        "type": "object",
+        "description": "Успешный ответ с текстовым сообщением.",
+        "required": ["message"],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Сообщение о результате операции.",
+            "example": "ok"
+          }
+        },
+        "additionalProperties": false
+      },
+      "VerifyOTPResponse": {
+        "type": "object",
+        "description": "Ответ после успешной проверки OTP-кода.",
+        "required": ["token"],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "JWT-токен пользователя.",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example.signature"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "Ответ с ошибкой.",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Текст ошибки.",
+            "example": "invalid email"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Некорректный запрос: неверный JSON, невалидный email, неверный или истекший OTP-код.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "invalidJson": {
+                "summary": "Невалидный JSON",
+                "value": {
+                  "error": "invalid json"
+                }
+              },
+              "invalidEmail": {
+                "summary": "Невалидный email",
+                "value": {
+                  "error": "invalid email"
+                }
+              },
+              "invalidOtp": {
+                "summary": "Неверный OTP-код",
+                "value": {
+                  "error": "invalid otp code"
+                }
+              },
+              "otpExpired": {
+                "summary": "OTP-код истек",
+                "value": {
+                  "error": "otp expired"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Пользователь не авторизован: токен отсутствует, истек, не найден или не прошел проверку.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "unauthorized": {
+                "summary": "Не авторизован",
+                "value": {
+                  "error": "unauthorized"
+                }
+              },
+              "tokenNotFound": {
+                "summary": "Токен не найден",
+                "value": {
+                  "error": "token not found"
+                }
+              },
+              "tokenExpired": {
+                "summary": "Токен истек",
+                "value": {
+                  "error": "token expired"
+                }
+              }
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Превышено количество попыток ввода OTP-кода.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": "too many attempts"
+            }
+          }
+        }
+      },
+      "MethodNotAllowed": {
+        "description": "HTTP-метод не поддерживается для данного endpoint.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": "method not allowed"
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "Внутренняя ошибка сервиса: ошибка сохранения OTP, отправки письма, работы с базой данных, Kafka или генерации токена.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "internal": {
+                "summary": "Внутренняя ошибка",
+                "value": {
+                  "error": "internal error"
+                }
+              },
+              "sendMail": {
+                "summary": "Ошибка отправки письма",
+                "value": {
+                  "error": "send mail failed"
+                }
+              },
+              "kafka": {
+                "summary": "Ошибка публикации Kafka-события",
+                "value": {
+                  "error": "kafka publish failed"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
