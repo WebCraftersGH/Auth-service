@@ -27,8 +27,8 @@ jobs:
 
       - name: Push image
         run: |
-          docker push ghcr.io/webcraftersgh/auth-service/edu-service:latest
-          docker push ghcr.io/webcraftersgh/auth-service/edu-service:${{ github.sha }}
+          docker push ghcr.io/webcraftersgh/auth-service/auth-service:latest
+          docker push ghcr.io/webcraftersgh/auth-service/auth-service:${{ github.sha }}
 
       - name: Deploy on server
         uses: appleboy/ssh-action@v1.0.3
